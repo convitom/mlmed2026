@@ -1,6 +1,6 @@
 USTH Machine Learning in Medicine 2026
 ==================================
 
-* Your name here
-* Your ID here
+* Phạm Minh Hiếu
+* 23BI14165
 * Your team ID here
