@@ -1,0 +1,134 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{float}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\title{ECG Arrhythmia Classification using Stacking Ensemble Learning}
+
+\author{\IEEEauthorblockN{Report 1}
+\IEEEauthorblockA{\textit{Machine Learning Experimentation}}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This report presents a stacking ensemble approach for ECG heartbeat arrhythmia classification using the MIT-BIH Arrhythmia Dataset. Instead of relying on a single classifier or deep neural networks, the proposed system combines multiple tree-based models—Extra Trees, Random Forest, LightGBM, and XGBoost—into a two-level stacking framework. Out-of-fold class probability predictions are used as meta-features and fed into an XGBoost meta-classifier. The ensemble is evaluated using stratified cross-validation and achieves strong generalization performance on the unseen test set, demonstrating the effectiveness of ensemble learning for non-linear ECG signal classification.
+\end{abstract}
+
+\section{Introduction}
+Electrocardiogram (ECG) analysis plays a critical role in diagnosing cardiac arrhythmias. While deep learning models such as Convolutional Neural Networks (CNNs) have achieved remarkable performance, they often require extensive computational resources and large-scale tuning.
+
+Ensemble learning offers an alternative by combining multiple strong but diverse classifiers to capture complex, non-linear patterns in ECG signals. In this study, we implement a stacking ensemble framework using classical machine learning models to classify ECG heartbeats into five arrhythmia categories.
+
+\section{Dataset Description}
+The dataset is derived from the MIT-BIH Arrhythmia Database and consists of pre-segmented heartbeat signals.
+
+\subsection{Data Structure}
+The dataset is provided in two CSV files:
+\begin{itemize}
+    \item \texttt{mitbih\_train.csv}
+    \item \texttt{mitbih\_test.csv}
+\end{itemize}
+
+Each sample contains 188 columns:
+\begin{itemize}
+    \item \textbf{Columns 0--186}: ECG signal amplitudes sampled at 125 Hz
+    \item \textbf{Column 187}: Target class label (0--4)
+\end{itemize}
+
+\subsection{Class Distribution}
+The dataset exhibits severe class imbalance, with Normal beats dominating the data. No explicit resampling is applied; instead, ensemble diversity and probabilistic stacking are used to improve minority class recognition.
+
+\section{Methodology}
+
+\subsection{Noise Augmentation}
+To improve robustness and reduce overfitting, Gaussian noise is added to the training data:
+\[
+X' = X + \mathcal{N}(0, 0.01)
+\]
+This simulates realistic signal variations and improves model generalization.
+
+\subsection{Base Models}
+Four heterogeneous tree-based classifiers are used as base learners:
+\begin{itemize}
+    \item Extra Trees Classifier (ET)
+    \item Random Forest (RF)
+    \item Light Gradient Boosting Machine (LGBM)
+    \item Extreme Gradient Boosting (XGBoost)
+\end{itemize}
+
+All base models are trained to output class probability vectors using \texttt{predict\_proba}.
+
+\subsection{Stacking Strategy}
+A stratified K-fold cross-validation scheme ($K=7$) is used to generate out-of-fold predictions for each base model. For each training sample, predicted class probabilities from all base models are concatenated to form the meta-feature vector:
+\[
+\mathbf{z}_i = [p^{ET}_i, p^{RF}_i, p^{LGB}_i, p^{XGB}_i]
+\]
+
+\subsection{Meta-Model}
+The meta-classifier is an XGBoost model trained on the stacked probability features. This allows the meta-model to learn optimal combinations of base model outputs and resolve inter-model disagreements.
+
+\section{Experimental Setup}
+\subsection{Cross-Validation}
+Stratified K-Fold cross-validation ensures class distribution consistency across folds. Accuracy is used as the primary validation metric during base-model training.
+
+\subsection{Evaluation Metrics}
+Final evaluation on the test set includes:
+\begin{itemize}
+    \item Overall Accuracy
+    \item Macro-averaged Precision
+    \item Macro-averaged Recall
+    \item Macro-averaged F1-score
+\end{itemize}
+
+\section{Results and Discussion}
+
+
+\subsection{Classifiaction result}
+Table~\ref{tab:class_results} reports the class-wise performance of the stacking ensemble model on the test set.
+
+\begin{table}[htbp]
+\caption{Class-wise Classification Performance}
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Class} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-score} \\
+\midrule
+0 & 0.98 & 0.99 & 0.99 \\
+1 & 0.89 & 0.76 & 0.82 \\
+2 & 0.96 & 0.94 & 0.95 \\
+3 & 0.84 & 0.75 & 0.76  \\
+4 & 0.99 & 0.97 & 0.98  \\
+\midrule
+\textbf{Macro Avg} & 0.93 & 0.88 & 0.90 \\
+\textbf{Weighted Avg} & 0.98 & 0.98 & 0.98 \\
+\textbf{Overall accuracy} & 0.98 \\
+\bottomrule
+\end{tabular}
+\label{tab:class_results}
+\end{center}
+\end{table}
+
+\subsection{Confusion Matrix Analysis}
+
+Figure~\ref{fig:confusion_matrix} presents the confusion matrix of the stacking ensemble model evaluated on the test set.
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.95\linewidth]{output.png}
+    \caption{Confusion matrix of the stacking ensemble model on the MIT-BIH test set.}
+    \label{fig:confusion_matrix}
+\end{figure}
+
+\section{Conclusion}
+This study demonstrates that stacking ensemble learning is an effective and computationally efficient solution for ECG arrhythmia classification. By combining multiple tree-based classifiers and leveraging probabilistic meta-features, the proposed approach achieves strong performance without relying on deep neural networks(in fact, deep neural network is better when the dataset is too large or the data is unstructured tabular, otherwise our  boost family is still the best :))).
+
+\end{document}
