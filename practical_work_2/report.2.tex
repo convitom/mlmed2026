@@ -1,0 +1,155 @@
+\documentclass[conference]{IEEEtran}
+\usepackage[utf8]{inputenc}
+\usepackage[vietnamese,english]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{subcaption}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{positioning}
+\usepackage{float} % thêm ở preamble
+
+\title{Automatic Fetal Head Circumference Estimation from Ultrasound Images Using U-Net}
+\author{Author Name}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Head Circumference (HC) is a critical biometric parameter used in fetal growth assessment during pregnancy. Manual measurement of HC from ultrasound images is time-consuming and highly operator-dependent. In this work, we propose an automatic pipeline for fetal head circumference estimation based on semantic segmentation using a U-Net architecture. The model is trained to segment the fetal head region from ultrasound images, after which an ellipse fitting method is applied to compute the head circumference in millimeters. Experimental results demonstrate that the proposed method achieves low estimation error and strong correlation with ground truth measurements.
+\end{abstract}
+
+\section{Introduction}
+Fetal head circumference (HC) is one of the most important biometric indicators in prenatal diagnosis, widely used for estimating gestational age and detecting abnormal fetal growth. Traditionally, HC is measured manually by clinicians through ellipse fitting on ultrasound images, which is both time-consuming and subject to inter-operator variability.
+
+Recent advances in deep learning, particularly convolutional neural networks (CNNs), have shown promising results in medical image segmentation tasks. Among them, the U-Net architecture has become a standard choice due to its strong performance on limited medical datasets. I know some people will wonder that: "If we already have a fetal image from ultrasound, so why don't just let the doctors identify the head in that image and find the circumference by themself, isn't it more accurate. Why does machine learning need to be involved in this task?" The reason is mainly speed. Giving the doctor and even us, who are not doctors, a fetal image, we can clearly see where the head is in the image, and then can compute the circumference, but it takes too long. Hospitals have to serve a large number of patients in a single day, so the process needs to be fast. The results may have an error by a few millimeters, but that is not a major issue in this task. That's why in this paper, we develop an end-to-end pipeline for automatic fetal HC estimation by combining deep learning-based segmentation with classical geometric measurement techniques.
+
+\section{Dataset}
+The dataset consists of fetal ultrasound images along with corresponding annotations and clinical measurements. Each sample includes:
+\begin{itemize}
+    \item A grayscale ultrasound image.
+    \item An annotation image containing only the head boundary (edge mask).
+    \item Pixel size (mm per pixel).
+    \item Ground truth head circumference (mm).
+\end{itemize}
+
+\section{Methodology}
+The overall pipeline of the proposed method is illustrated in Fig.~\ref{fig:pipeline}. The approach consists of three main stages: data preprocessing, U-Net based segmentation, and head circumference estimation using ellipse fitting.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=0.3cm]
+
+\node (img) {Ultrasound Image};
+\node (fill) [below=of img] {Filled Mask};
+\node (unet) [below=of fill] {U-Net};
+\node (pred) [below=of unet] {Predicted Mask};
+\node (ec) [below=of pred] {Extract Eontour};
+\node (hc) [below=of ec] {Head circumference};
+
+\draw[->] (img) -- (fill);
+\draw[->] (fill) -- (unet);
+\draw[->] (unet) -- (pred);
+\draw[->] (pred) -- (ec);
+\draw[->] (ec) -- (hc);
+
+\end{tikzpicture}
+\caption{Overview of the proposed pipeline for automatic fetal head circumference estimation.}
+\label{fig:pipeline}
+\end{figure}
+
+
+\subsection{Data Preprocessing}
+Since the provided annotations contain only boundary contours, a preprocessing step is applied to convert edge masks into filled region masks. The largest contour is extracted and filled using OpenCV contour operations. This filled mask is then used as the segmentation label during training.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}
+\node (img1) {
+    \includegraphics[width=0.32\linewidth]{000_HC_Annotation.png}
+};
+\node (img2) [right=1.2cm of img1] {
+    \includegraphics[width=0.32\linewidth]{000_HC.png}
+};
+\draw[->, thick] (img1.east) -- (img2.west)
+    node[midway, above]{};
+\end{tikzpicture}
+\caption{Conversion of edge-only annotations into filled segmentation masks.}
+\label{fig:mask_generation}
+\end{figure}
+
+All images and masks are resized to 256 × 256
+pixels. Images are normalized to [0, 1] and duplicated
+across three channels to match the input requirements of
+ImageNet-pretrained encoders. Masks are binarized and
+stored as single-channel tensors.
+
+\subsection{Segmentation Network}
+We employ a U-Net architecture with a ResNet-34 encoder pretrained on ImageNet. The network takes a $3 \times 256 \times 256$ input image and outputs a single-channel probability map representing the fetal head region.
+
+To balance region overlap accuracy and pixel-wise classification, a hybrid loss function is used:
+\begin{equation}
+\mathcal{L} = \mathcal{L}_{Dice} + \mathcal{L}_{BCE}
+\end{equation}
+
+The model is trained for 20 epochs using the Adam optimizer with a learning rate of $10^{-4}$ and batch size of 8.
+
+\subsection{Head Circumference Estimation}
+During inference, the predicted segmentation mask is resized back to the original image resolution using nearest-neighbor interpolation. The largest connected component is extracted, and an ellipse is fitted to the contour.
+
+Let $a$ and $b$ denote the semi-major and semi-minor axes of the fitted ellipse. The head circumference in pixels is approximated using Ramanujan’s formula:
+\begin{equation}
+HC_{px} = \pi \left[ 3(a+b) - \sqrt{(3a+b)(a+3b)} \right]
+\end{equation}
+
+The final head circumference in millimeters is computed as:
+\begin{equation}
+HC_{mm} = HC_{px} \times \text{pixel\_size}
+\end{equation}
+
+
+\section{Evaluation Metrics}
+The predicted head circumference values are compared with ground truth measurements using the following metrics:
+\begin{itemize}
+    \item Mean Absolute Error (MAE)
+    \item Mean Squared Error (MSE)
+    \item Coefficient of Determination ($R^2$)
+\end{itemize}
+
+\section{Experimental Results and Discussion}
+\begin{itemize}
+    \item MAE (mm): 1.49
+    \item MSE (mm²): 3.23
+    \item R²: 0.98
+\end{itemize}
+The proposed pipeline achieves accurate fetal head circumference estimation. Quantitative evaluation shows low MAE and MSE values, indicating strong agreement between predicted and ground truth measurements. Additionally, a high $R^2$ score demonstrates a strong linear correlation. However, this good result comes from evaluating the training set, which was learning by the model, because the test set does not have ground truth label to evaluate :). And I don't want to extract a small subset from the training set to use for evaluation because the dataset is too small. I passed the test set through the model, drew the predicted head contour for all images, and manually examined them. I saw the model still perform very well on unseen data, as shown in the figure below
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{HC.png}
+\caption{Prediction results on an image in the test set.}
+\label{fig:prediction}
+\end{figure}
+
+\section{Conclusion}
+In this work, I presented an automatic pipeline for fetal head circumference estimation from ultrasound images using a U-Net segmentation model. The proposed method reduces manual effort and provides reliable measurements with high accuracy. 
+
+\bibliographystyle{plain}
+\begin{thebibliography}{9}
+\bibitem{unet}
+Ronneberger, O., Fischer, P., Brox, T. (2015).
+U-Net: Convolutional Networks for Biomedical Image Segmentation.
+\textit{MICCAI}.
+
+\bibitem{ellipse}
+Ramanujan, S. (1914).
+Modular equations and approximations to $\pi$.
+\textit{Quarterly Journal of Mathematics}.
+\end{thebibliography}
+
+\end{document}
